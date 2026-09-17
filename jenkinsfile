@@ -1,0 +1,49 @@
+pipeline {
+
+    agent any
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                bat 'python -m pip install -r requirements.txt'
+            }
+        }
+
+        stage('Setup Test Data') {
+            steps {
+                bat 'python setup_data.py'
+            }
+        }
+
+        stage('Run ETL Tests') {
+            steps {
+                catchError(
+                    buildResult: 'FAILURE',
+                    stageResult: 'FAILURE'
+                ) {
+                    bat '''
+                        if exist allure-results rmdir /s /q allure-results
+                        pytest -vs tests/test_patient_etl.py --alluredir=allure-results
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            allure([
+                results: [
+                    [path: 'allure-results']
+                ]
+            ])
+        }
+    }
+}
